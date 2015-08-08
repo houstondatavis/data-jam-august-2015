@@ -9,6 +9,7 @@ This data-set was pulled from the meetup API - querying for our own Meetup (Hous
 ##Fields
 
 |Field Key  | Description       |
+|-----------|-------------------|
 |**status** | active or inactive|
 |**city**   | City              |
 |**state**  | State             |
