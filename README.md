@@ -20,8 +20,8 @@ This data-set was pulled from the meetup API - querying for our own Meetup (Hous
 
 **lon**: longitude (center of zip code)
 
-**visited**: date of member's last visit to page
+**visited**: date of member's last visit to page (including mobile apps)
 
-**joined**: date member joined meetup
+**joined**: date member joined the Houston Datavis meetup
 
 **topics**: comma-separated list of interests
