@@ -3,6 +3,7 @@
     dt<-read.csv("meetupdata-Aug-08-2015.csv",header=T)
    
 #====FIND UNIQUE TOPICS LIST====
+    tp <- as.character(dt$topics)
     allTP<-paste(as.character(dt$topics), collapse=",")
     all.tp<-unlist(strsplit(allTP,","))
     unique.tp<-unique(all.tp)
