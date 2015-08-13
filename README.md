@@ -8,20 +8,14 @@ This data-set was pulled from the meetup API - querying for our own Meetup (Hous
 
 ##Fields
 
-**status:** active | inactive
-
-**city**: City
-
-**state**: State
-
-**country**: Country
-
-**lat**: latitude (center of zip code)
-
-**lon**: longitude (center of zip code)
-
-**visited**: date of member's last visit to page (including mobile apps)
-
-**joined**: date member joined the Houston Datavis meetup
-
-**topics**: comma-separated list of interests
+|Field Key  | Description       |
+|-----------|-------------------|
+|**status** | active or inactive|
+|**city**   | City              |
+|**state**  | State             |
+|**country**| Country           |
+|**lat**    | Latitude (center of zip code)|
+|**lon**    | Longitude (center of zip code)|
+|**visited**| Date of member's last visit to page (including mobile apps)|
+|**joined** | Date member joined the Houston Datavis meetup|
+|**topics** | Comma-separated list of interests|
