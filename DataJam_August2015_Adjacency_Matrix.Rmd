@@ -1,0 +1,133 @@
+---
+title: "August 2015 DataJam"
+author: "Tim Abram"
+date: "Sunday, August 09, 2015"
+output: html_document
+---
+_Description_: R script for generating an adjacency matrix of user interests (topics) from raw Meetup data for the Houston Data Visualization group (8/8/15). 
+_Contributors_: Tim, Gerardo, and Yuanbo  
+
+
+Read data from csv and get basic info
+```{r}
+dataset <-read.csv("meetupdata-Aug-08-2015.csv", header=T, as.is=T)
+str(dataset)
+head(dataset)
+```
+Parse strings within topic list, force all to uppercase (`toupper()`) and delete leading and trailing whitespace (`strsplit()`). Output number of unique topics and generate a simple frequency count. Generate histogram of the frequency of unique topics to estimate where a cut-off should be made. _Note that the vast majority of topics are only listed once, leading to a very sparse matrix_
+
+```{r}
+library(stringr)
+topics <-str_trim(toupper(unlist(strsplit(as.character(dataset[,"topics"]), ","))))
+```
+There are `r length(unique(topics))` unique topics in the given dataset.
+```{r}
+topic_count <-as.data.frame(table(topics))
+topic_count <-topic_count[(order(topic_count$Freq)),]
+
+library(ggplot2)
+ggplot(topic_count, aes(x=topic_count[,"Freq"])) +geom_histogram()+geom_vline(x=10)+
+  ggtitle('Frequency of Unique Topics, v-line = 10')
+```
+
+Next, we needed to relate the separate topics back to their unique users by creating a sparse matrix of columns for each topic where 1 = user-topic match and 0 = no match. (This code was created by Yuanbo; check out his [R file on the github page](https://github.com/houstondatavis/data-jam-august-2015/blob/master/Table_R_Code.R))
+
+```{r}
+  all_tp<-topics
+  unique_tp<-unique(topics)
+  tp <-dataset$topics
+
+ tp_list<-list()
+    for(i in 1:length(tp)){
+        tp_list[[i]]<-unlist(strsplit(tp[i],","))
+    }
+#====CREATE COLUMNS DATA FRAME=======
+    col<-matrix(data=0,nrow=length(tp_list),ncol=length(unique_tp))
+    for (j in 1:length(tp_list)){
+        idx<-which(tp_list[[j]] %in% unique_tp)
+        col[j,idx]<-1
+    }
+    colDF<-data.frame(col)
+    names(colDF)<-unique_tp
+#====OUTPUT PROCESSED FILES=======
+    #dt_output<-cbind(dt,colDF)
+    #write.csv(dt.output,"meetupdata-Aug-08-2015-mod.csv",row.names=F,col.names=T)
+```
+
+Gerardo used an alternative method for linking users to their individual topics by expanding the original table so that each row contained a single topic (repeated user info/user IDs for users with more than 1 topic in their original topic "list"). With this table, he could use the `cast` function in `library(reshape2)`  to create a new table of unique topics (columns) by the unique userIDs (rows).  
+
+
+Of the 595 users in the raw dataset, 80 users didn't list any topics; the matrix returned upon the merge function contained the remaining 515 users. By increasing the cutoff frequency for topics (the inclusion criteria for the final table), the total number of users would decrease if a user's topics fell below the cutoff. 
+
+```{r}
+library(data.table)
+library(reshape2)
+dataset.dt <- fread("meetupdata-Aug-08-2015.csv", head=T)
+
+dt <- dataset.dt[, list("topics2" = unlist(strsplit(topics, ","))),
+          by = list(V1)]
+
+dt$topics2 <- toupper(str_trim(dt$topics2))
+
+all <- merge(dataset.dt, dt, by = c("V1"))
+all <- all[,!"topics", with=FALSE]
+all$value <- 1
+
+head(topic_count)
+
+fcut <- 80 #Frequency cutoff for selecting individual topics
+freq <- all[, list(freq = sum(value, na.rm=T)), by = list(topics2)]
+freq <- freq[freq>fcut]
+
+head(freq)
+
+combo <- merge(all, freq, by="topics2")
+
+dt <- dcast(combo,  topics2 ~ V1, drop=F)
+dt[is.na(dt)] <- 0
+row.names(dt) <- dt[,1]
+dt <- dt[,-1]
+
+# Use matrix multiplication to generate adjacency matrix (component-wise addition)
+adj_matrix <- as.matrix(dt) %*% t(as.matrix(dt))
+```
+
+## Adjacency Matrix -> Node/Edge List for Network Plots
+The `igraph` package has built-in functionality for converting an adjacency table to its corresponding node list and edge list, which are usually the required data inputs for most network visualizations. To create the d3 force-directed network graph, I used the `d3Network` library, which takes the node/edge list and outputs a stand-alone html file. 
+
+```{r, results='asis'}
+library(igraph)
+g <- graph.adjacency(adj_matrix, weighted=T, mode="undirected")    #id starts from 0 (in igraph)
+g<-simplify(g) #removes diagonal matrix (i.e. topic[a,a])
+
+links <-get.data.frame(g, what='edges') 
+nodes <-get.data.frame(g, what='vertices')
+
+# Need to convert names to numerical index for d3ForceNetwork rendering
+l = unique(c(as.character(nodes$name)))
+links$from <-as.numeric(factor(links$from, levels=l))-1
+links$to <-as.numeric(factor(links$to, levels=l))-1
+
+library(d3Network)
+
+d3ForceNetwork(Links = links, Nodes = nodes,
+               Source = "from", Target = "to",
+               Value = "weight",
+               NodeID = "name",
+               linkDistance= 100,
+               charge = 0,
+               linkWidth= 0.5,
+               width = 400, height = 600,
+               opacity = 0.9, 
+               zoom=FALSE, 
+               fontsize = 7,
+               parentElement = "body",
+               iframe=TRUE)
+               
+               #standAlone = TRUE,
+               #file = "Force_directed_4-large2c.html")
+
+```
+
+Even though we expect to see a messy network plot given the 2k+ links and high degree of overlap in categories, I don't think the "weight" factor (amount of times 2 topics show up together) is being used correctly... 
+Needs some pre-processing to clean up the visualization so that hopefully some interesting patterns will emerge. 
